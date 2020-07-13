@@ -169,7 +169,7 @@ class watermark():
                 f'block num: {block_h_num}x{block_v_num} | '
                 f'watermark: {wm_w}x{wm_h}')
 
-    def auto_block(self, src_shape, wm_shape=(64, 64), multiple=4, method=2):
+    def auto_block(self, src_shape, wm_shape=(64, 64), multiple=4):
         '''
         自动计算block大小
         这里考虑有限保证画质，尽量 2^dwt_deep * block >=8(jpg 压缩以8px为单位)
@@ -183,98 +183,63 @@ class watermark():
         multiple其实是根据水印大小在动态变化的。
         multiple<1等于图片不足以承载水印的数据。
         '''
-        log.debug(f'===auto block===\n{src_shape=}\n{wm_shape=}\n{method=}')
+        log.debug(f'===auto block===\n{src_shape=}\n{wm_shape=}')
         multiple_target = 1
         block_list = []
 
-        if method == 1:  # 回退法 优先退deep 然后升block降multiple
-            for i, edge in enumerate(src_shape):
-                _deep = self.dwt_deep
-                block = int(edge / (2**_deep) / wm_shape[i] / multiple)
-                log.debug(f'{block = }')
-                while True:
-                    multiple = edge / (2**_deep) / wm_size / (block or 1)
-                    log.debug(f'{block=} | {block * (2**_deep)=} | {multiple=}')
+        for i, edge in enumerate(src_shape):
+            result = None
+            # 获得所有合法的参数组合
+            prm = []  # params list
+            for _deep in range(self.dwt_deep, -1, -1):
+                for block in range(1, edge + 1):
+                    final = 2**_deep * block  # 最终映射到原图的块尺寸
+                    multiple = edge / final / wm_shape[i]
+                    if multiple < 1:
+                        break  # quit block loop
+                    prm.append({'dwt_deep': _deep, 'block': block,
+                                'final': final, 'multiple': multiple})
 
-                    # 优先降dwt deep
-                    if (_deep > 0   # dwt可减
-                        and multiple < multiple_target + 1   # 容量过小
-                        and block * (2**_deep) < 8  # 避免 (dwt:0,block:8) 这类情况
-                        ):
-                        _deep -= 1
-                        log.debug(f'{_deep =} (--)')
-                        block = 1
-                        continue
+            def mini_sort(_list, _key, reverse=True):  # 缩写sort 纯为了pep8
+                return sorted(_list, key=lambda x: x[_key], reverse=reverse)
+            # 最终块越大 计算次数越少
+            prm = mini_sort(prm, 'final')
+            # 倍数越大 还原品质越高
+            prm = mini_sort(prm, 'multiple')
+            # [print(i) for i in prm]
 
-                    # 如果最终的原图上的块达到8px or 容量不足(block过大)
-                    if block * (2**_deep) > 8 or multiple < multiple_target:
-                        block = max(block - 1, 0)  # 返回上一次合法的block(避免负数)
-                        break
-
-                    block += 1
-
-                multiple = edge / (2**_deep) / wm_size / (block or 1)  # real
-                print(f'{["h","w"][i]} | _deep({_deep}) * block({block}) = '
-                      f'{2**_deep*block} ({multiple=:.2f}) {edge=}')
-                block_list.append((block, _deep))
-
-            block, dwt_deep = sorted(block_list, key=lambda x: x[0])[0]
-            final_block = 2**dwt_deep * block
-
-        if method == 2:  # 穷举法 穷举所有组合 逻辑更易读一些
-            for i, edge in enumerate(src_shape):
-                result = None
-                # 获得所有合法的参数组合
-                prm = []  # params list
-                for _deep in range(self.dwt_deep, -1, -1):
-                    for block in range(1, edge + 1):
-                        final = 2**_deep * block  # 最终映射到原图的块尺寸
-                        multiple = edge / final / wm_shape[i]
-                        if multiple < 1:
-                            break  # quit block loop
-                        prm.append({'dwt_deep': _deep, 'block': block,
-                                    'final': final, 'multiple': multiple})
-
-                def mini_sort(_list, _key, reverse=True):  # 缩写sort 纯为了pep8
-                    return sorted(_list, key=lambda x: x[_key], reverse=reverse)
-                # 最终块越大 计算次数越少
-                prm = mini_sort(prm, 'final')
-                # 倍数越大 还原品质越高
-                prm = mini_sort(prm, 'multiple')
-                # [print(i) for i in prm]
-
-                # 优先选择符合倍数的 jpg压缩画质会比卡中间的好很多
-                grid_match = [i for i in prm if i['final'] % 8 == 0]
-                if grid_match and grid_match[0]['multiple'] >= 1:
-                    # 这里尝试限制最小的block范围
-                    # dwt3blk1和dwt1blk4区别，blk4色偏移更小，解码效果更好。
-                    # 但极端情况下解码效果不如d3b1 (mini512i大片黑底)
-                    big_block = [i for i in grid_match if i['block'] >= 4]
-                    if big_block:  # 满足8的倍数时 block不要过小 奇异值会更准
-                        result = big_block[0]
-                    else:
-                        result = grid_match[0]
-                    log.debug(f'Match Grid: {result}')
+            # 优先选择符合倍数的 jpg压缩画质会比卡中间的好很多
+            grid_match = [i for i in prm if i['final'] % 8 == 0]
+            if grid_match and grid_match[0]['multiple'] >= 1:
+                # 这里尝试限制最小的block范围
+                # dwt3blk1和dwt1blk4区别，blk4色偏移更小，解码效果更好。
+                # 但极端情况下解码效果不如d3b1 (mini512i大片黑底)
+                big_block = [i for i in grid_match if i['block'] >= 4]
+                if big_block:  # 满足8的倍数时 block不要过小 奇异值会更准
+                    result = big_block[0]
                 else:
-                    # 优先选择还原能力强的
-                    for _target in [1.5, 1]:
-                        match = [i for i in prm if i['multiple'] >= _target]
-                        if match:
-                            # 选择块数最少的
-                            biggest = mini_sort(match, 'final')
-                            result = biggest[0]
-                            log.debug(f'BIG: {biggest[0]}')
-                            break
-                block_list.append(result if result else None)
-
-            if None in block_list:  # 有一边未找到合适参数
-                final_block = dwt_deep = block = 0
+                    result = grid_match[0]
+                log.debug(f'Match Grid: {result}')
             else:
-                r = mini_sort(block_list, 'block', reverse=False)[0]
-                dwt_deep, block = r.get('dwt_deep', 0), r.get('block', 0)
-                final_block, multiple = r.get('final', 0), r.get('multiple', 0)
-                print(f'dwt_deep({dwt_deep}) x block({block}) = {final_block}'
-                      f' ({multiple=:.2f})')
+                # 优先选择还原能力强的
+                for _target in [1.5, 1]:
+                    match = [i for i in prm if i['multiple'] >= _target]
+                    if match:
+                        # 选择块数最少的
+                        biggest = mini_sort(match, 'final')
+                        result = biggest[0]
+                        log.debug(f'BIG: {biggest[0]}')
+                        break
+            block_list.append(result if result else None)
+
+        if None in block_list:  # 有一边未找到合适参数
+            final_block = dwt_deep = block = 0
+        else:
+            r = mini_sort(block_list, 'block', reverse=False)[0]
+            dwt_deep, block = r.get('dwt_deep', 0), r.get('block', 0)
+            final_block, multiple = r.get('final', 0), r.get('multiple', 0)
+            print(f'dwt_deep({dwt_deep}) x block({block}) = {final_block}'
+                  f' ({multiple=:.2f})')
 
         if block == 0:
             print(f'⬇⬇⬇\nError: Source image too small ({src_shape=})\n⬆⬆⬆')
