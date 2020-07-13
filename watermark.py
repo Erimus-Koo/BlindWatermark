@@ -116,57 +116,6 @@ class watermark():
         out_img = out_img[:src_h, :src_w]  # 还原原图尺寸
         return out_img
 
-    def devide_block(self, dwt_img):
-        '''
-        弃用。感觉没必要切分。
-        发现原来为了切分，要好几个维度来定位，还需要考虑边缘等情况。
-        直接在原图上切片出block，然后转好了放回原位比较方便。
-        但因为as_strided还挺绕的，所以暂时没舍得删。
-        '''
-        # 准备分块
-        dwt_h, dwt_w = dwt_img[0].shape[:2]
-        log.debug(f'dwt img: w={dwt_w} | h={dwt_h}')
-        block_w, block_h = self.block_shape
-        log.debug(f'block: w={block_w} | h={block_h}')
-
-        # 分块大小检查
-        if block_w > dwt_w or block_h > dwt_h:
-            print('Error: Unable devide the original image into blocks.\n'
-                  f'Original: {w}x{h} | dwt_deep: {self.dwt_deep}\n'
-                  f'dwt img: {dwt_w}x{dwt_h} | block: {block_w}x{block_h}')
-            raise
-
-        block_shape = (int(dwt_h / block_h),  # 总块行数=图高/block高
-                       int(dwt_w / block_w),  # 总块列数=图宽/block宽
-                       block_h,  # 单块行数=block高
-                       block_w)  # 单块列数=block宽
-        log.debug(f'{block_shape = }')
-
-        # 元素间隔
-        strides = dwt_img[0].itemsize * (
-            np.array([dwt_w * block_h,  # 大行高度=图宽度*block高
-                      block_w,  # 大列宽度=block宽
-                      dwt_w,  # 小行=图宽度
-                      1]))  # 小列=1
-        log.debug(f'{strides = }')
-
-        # block分块 [[四维数组]*channel]
-        blocks = [
-            np.lib.stride_tricks.as_strided(_channel, block_shape, strides)
-            for _channel in dwt_img]
-
-        # 显示分块图 检查切割是否正常
-        temp = []
-        for _i, src in enumerate(dwt_img):
-            merge = np.vstack([np.hstack(row) for row in blocks[_i]])
-            src_h, src_w = src.shape
-            merge_h, merge_w = merge.shape
-            merge = np.c_[merge, np.zeros((merge_h, src_w - merge_w))]
-            merge = np.r_[merge, np.zeros((src_h - merge_h, merge.shape[1]))]
-            temp.append(np.concatenate((src, merge), axis=1))
-        imshow(f'Merge block (ori | merge) * channel', np.hstack(temp))
-        cv2.waitKey(0)
-
     def load_watermark(self, wm_file):
         '''
         读取水印文件，转为灰度，根据seed乱序。
