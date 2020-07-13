@@ -1,5 +1,5 @@
 # My Ignore List
-test/
+/test/
 *.sublime-workspace
 
 # Byte-compiled / optimized / DLL files
