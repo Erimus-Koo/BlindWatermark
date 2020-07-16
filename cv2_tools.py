@@ -40,26 +40,27 @@ class cv_text():
         x -= int(h_dict[align[0]])
         v_dict = {'bottom': 0, 'top': h, 'mid': h / 2}
         y += int(v_dict[align[1]])
-        canvas = cv2.putText(canvas, text, (x, y), self.font, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+        canvas = cv2.putText(canvas, text, (x, y), self.font, scale, (0, 0, 0), 1, cv2.LINE_AA)
         return canvas
 
 
-def text_test():
+def text_test(content='Font Family'):
     # 试绘文字相关的 字体 宽高 基线
     font = 0
     black, blue, red = (0, 0, 0), (255, 0, 0), (0, 0, 255)
     pd = 50
     cvs_list = []
     W = H = 0  # total
+    scale = 1
     for font in range(8):
-        (w, h), bl = cv2.getTextSize(f'Font Family: {font}', font, 1, 1)
+        (w, h), bl = cv2.getTextSize(f'{content}: {font}', font, scale, 1)
         ch, cw = h + pd * 2, w + pd * 2
         W = max(W, cw)
         H += ch
         cvs = np.zeros((ch, cw, 3), np.uint8)
         cvs.fill(255)
-        cvs = cv2.putText(cvs, f'Font Family: {font}', (pd, pd + h),
-                          font, 1, black, 1, cv2.LINE_AA)
+        cvs = cv2.putText(cvs, f'{content}: {font}', (pd, pd + h),
+                          font, scale, black, 1, cv2.LINE_AA)
         cvs = cv2.rectangle(cvs, (1, 1), (cw - 2, ch - 2), black)
         cvs = cv2.rectangle(cvs, (pd, pd), (w + pd, h + pd), blue)
         cvs = cv2.line(cvs, (pd, pd + h + bl), (pd + w, pd + h + bl), red)
