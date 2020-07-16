@@ -77,10 +77,12 @@ class watermark():
         dwt_unit = 2**self.dwt_deep
         if src_w % dwt_unit:  # 补横向
             w_gap = dwt_unit - src_w % dwt_unit
-            img = np.hstack((img, np.ones((src_h, w_gap, 3))))
+            right = np.ones((src_h, w_gap, 3)).astype(np.float32)
+            img = np.hstack((img, right))
         if src_h % dwt_unit:  # 补纵向
             h_gap = dwt_unit - src_h % dwt_unit
-            img = np.vstack((img, np.ones((h_gap, img.shape[1], 3))))
+            bottom = np.ones((h_gap, img.shape[1], 3)).astype(np.float32)
+            img = np.vstack((img, bottom))
 
         # 绘制原图各通道
         # imshow(f'ori channels ({self.color_mode})', np.hstack(dwt_data[0]['a']))
@@ -341,7 +343,6 @@ class watermark():
         curve_h, curve_w = dwt_img[0].shape[:2]  # 最终dwt后的宽高
         block_w, block_h = self.block_shape  # block宽高
         block_h_num, block_v_num = curve_w // block_w, curve_h // block_h
-        # self.devide_block(dwt_img)  # 弃用
 
         self.check_block(dwt_img, wm_data)  # 分块数是否足以记录水印
 
@@ -375,6 +376,7 @@ class watermark():
 
         # 保存图片
         self.save_image(output, out_img, jpg_quality)
+        return out_img  # 为了测试时保存不同质量的jpg 避免重复计算
 
     def extract(self, *, src, wm_w=64, wm_h=64, output=None, channel=1):
         '''
