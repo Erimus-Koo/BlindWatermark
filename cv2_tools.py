@@ -27,24 +27,30 @@ class cv_text():
     '''
     简化cv2上的文字打印，增加对齐支持。
     '''
+
     def __init__(self, font_family=None, font_size=14):
         self.font = font_family or 0
         (w, h), baseline = cv2.getTextSize('Bag', self.font, 1, 1)
         print(f'{w=} {h=} {baseline=}')
         self.base_size = h
 
-    def put(self, canvas, text, x, y, size=14, align=('left', 'bottom')):
+    def put(self, canvas, text, x, y, size=14, align=('bottom', 'left')):
         scale = size / self.base_size
-        (w, h), bl = cv2.getTextSize(text, self.font, fontScale=scale, thickness=1)
-        h_dict = {'left': 0, 'right': w, 'mid': w / 2}
-        x -= int(h_dict[align[0]])
-        v_dict = {'bottom': 0, 'top': h, 'mid': h / 2}
-        y += int(v_dict[align[1]])
-        canvas = cv2.putText(canvas, text, (x, y), self.font, scale, (0, 0, 0), 1, cv2.LINE_AA)
+        (w, h), bl = cv2.getTextSize(text, self.font,
+                                     fontScale=scale, thickness=1)
+        v_dict = {'bottom': 0, 'top': h, 'middle': h / 2}
+        h_dict = {'left': 0, 'right': w, 'center': w / 2}
+        for k in align:
+            if k in v_dict:
+                y += int(v_dict[k])
+            elif k in h_dict:
+                x -= int(h_dict[k])
+        canvas = cv2.putText(canvas, text, (x, y), self.font,
+                             scale, (0, 0, 0), 1, cv2.LINE_AA)
         return canvas
 
 
-def text_test(content='Font Family'):
+def test_text(content='Font Family'):
     # 试绘文字相关的 字体 宽高 基线
     font = 0
     black, blue, red = (0, 0, 0), (255, 0, 0), (0, 0, 255)
@@ -80,8 +86,27 @@ def text_test(content='Font Family'):
     cv2.waitKey(0)
 
 
+def test_align():
+    h = w = 256
+    cvs = np.zeros((h * 2, w * 2, 3), np.uint8)
+    cvs.fill(255)
+
+    cvs = cv2.line(cvs, (0, h), (w * 2, h), (0, 0, 0))
+    cvs = cv2.line(cvs, (w, 0), (w, h * 2), (0, 0, 0))
+
+    cvtxt = cv_text()
+    size = 12
+    cvtxt.put(cvs, 'left top', w, h, size=size, align=('left', 'top'))
+    cvtxt.put(cvs, 'left bottom', w, h, size=size, align=('left', 'bottom'))
+    cvtxt.put(cvs, 'right top', w, h, size=size, align=('right', 'top'))
+    cvtxt.put(cvs, 'right bottom', w, h, size=size, align=('right', 'bottom'))
+    imshow('test align', cvs)
+
+
 # ═══════════════════════════════════════════════
 
 if __name__ == '__main__':
 
-    text_test()
+    test_text()
+
+    test_align()
