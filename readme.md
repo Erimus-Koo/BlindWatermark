@@ -29,10 +29,10 @@
 
 -   卡通图片  
     ![](pic/comic.png)
-    ![](readme/test/comic_wm64_map1_dwt1_block4_wms1234_blks5678_jpg30-100_mod16-32.png)
+    ![](readme/test/comic_wm64_map1_dwt1_block4_wms1234_blks5678_mod16-32_jpg30-100.png)
 
 > 大部分情况下，默认参数 mod24 抵抗 jpg50 的压缩没有问题。  
-> 更多详细测试结果，点这里。
+> 更多详细测试结果，[点这里](readme/test.md)。
 
 ## 2 源项目
 
